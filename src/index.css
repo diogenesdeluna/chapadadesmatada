@@ -1,0 +1,221 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    /* Identidade Visual MapeIA: Ocre, Terra, Rubro, Branco, Preto */
+    --color-preto: #141210;
+    --color-preto-soft: #24201c;
+    --color-branco: #ffffff;
+    --color-branco-off: #faf7f2;
+    --color-branco-warm: #f4eee3;
+    
+    --color-terra: #7b3819;
+    --color-terra-dark: #58240f;
+    --color-terra-light: #f6ede7;
+    --color-terra-border: #e8d0c2;
+    
+    --color-ocre: #c07d19;
+    --color-ocre-dark: #8c570a;
+    --color-ocre-light: #fbf5e7;
+    --color-ocre-border: #ecd8b3;
+    
+    --color-rubro: #9e1f1f;
+    --color-rubro-dark: #731313;
+    --color-rubro-light: #fdf2f2;
+    --color-rubro-border: #f4c6c6;
+  }
+
+  body {
+    font-family: 'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+    color: #141210;
+    background-color: #faf7f2;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  code, kbd, samp, pre, .font-mono {
+    font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+/* Custom Visual Identity Classes: Ocre, Terra, Rubro, Branco, Preto */
+.bg-preto { background-color: #141210; }
+.bg-preto-soft { background-color: #24201c; }
+.text-preto { color: #141210; }
+.border-preto { border-color: #141210; }
+
+.bg-terra { background-color: #7b3819; }
+.bg-terra-dark { background-color: #58240f; }
+.bg-terra-light { background-color: #f6ede7; }
+.text-terra { color: #7b3819; }
+.text-terra-dark { color: #58240f; }
+.border-terra { border-color: #7b3819; }
+.border-terra-light { border-color: #e8d0c2; }
+
+.bg-ocre { background-color: #c07d19; }
+.bg-ocre-dark { background-color: #8c570a; }
+.bg-ocre-light { background-color: #fbf5e7; }
+.text-ocre { color: #c07d19; }
+.text-ocre-dark { color: #8c570a; }
+.border-ocre { border-color: #c07d19; }
+.border-ocre-light { border-color: #ecd8b3; }
+
+.bg-rubro { background-color: #9e1f1f; }
+.bg-rubro-dark { background-color: #731313; }
+.bg-rubro-light { background-color: #fdf2f2; }
+.text-rubro { color: #9e1f1f; }
+.text-rubro-dark { color: #731313; }
+.border-rubro { border-color: #9e1f1f; }
+.border-rubro-light { border-color: #f4c6c6; }
+
+/* Standardized Button System */
+.btn-base {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  font-weight: 600;
+  border-radius: 0.5rem;
+  transition: all 150ms ease-in-out;
+  cursor: pointer;
+  white-space: nowrap;
+  outline: none;
+}
+.btn-base:focus-visible {
+  ring: 2px;
+  ring-offset: 2px;
+}
+.btn-base:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.btn-sm {
+  padding: 0.375rem 0.75rem;
+  font-size: 0.75rem;
+  line-height: 1rem;
+}
+
+.btn-md {
+  padding: 0.5rem 1rem;
+  font-size: 0.8125rem;
+  line-height: 1.25rem;
+}
+
+.btn-lg {
+  padding: 0.625rem 1.25rem;
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+}
+
+/* Primary Button (Terra / Preto / Ocre Accent) */
+.btn-primary {
+  background-color: #7b3819;
+  color: #ffffff;
+  border: 1px solid #58240f;
+  box-shadow: 0 1px 2px 0 rgba(123, 56, 25, 0.2);
+}
+.btn-primary:hover {
+  background-color: #58240f;
+  border-color: #3f190a;
+}
+
+/* Secondary Button (Branco / Preto / Terra border) */
+.btn-secondary {
+  background-color: #ffffff;
+  color: #141210;
+  border: 1px solid #d4c5b9;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+}
+.btn-secondary:hover {
+  background-color: #faf7f2;
+  color: #7b3819;
+  border-color: #7b3819;
+}
+
+/* Success Validation Button (Ocre / Terra Gold) */
+.btn-success {
+  background-color: #c07d19;
+  color: #ffffff;
+  border: 1px solid #8c570a;
+  box-shadow: 0 1px 2px 0 rgba(192, 125, 25, 0.25);
+}
+.btn-success:hover {
+  background-color: #9f640e;
+}
+
+/* Success Light / Outline */
+.btn-success-light {
+  background-color: #fbf5e7;
+  color: #8c570a;
+  border: 1px solid #ecd8b3;
+}
+.btn-success-light:hover {
+  background-color: #f5e8cc;
+  border-color: #c07d19;
+}
+
+/* Danger / Error Button (Rubro) */
+.btn-danger {
+  background-color: #9e1f1f;
+  color: #ffffff;
+  border: 1px solid #731313;
+  box-shadow: 0 1px 2px 0 rgba(158, 31, 31, 0.25);
+}
+.btn-danger:hover {
+  background-color: #731313;
+}
+
+/* Danger Light / Outline */
+.btn-danger-light {
+  background-color: #fdf2f2;
+  color: #731313;
+  border: 1px solid #f4c6c6;
+}
+.btn-danger-light:hover {
+  background-color: #fae1e1;
+  border-color: #9e1f1f;
+}
+
+/* Terra Button */
+.btn-terra {
+  background-color: #7b3819;
+  color: #ffffff;
+  border: 1px solid #58240f;
+}
+.btn-terra:hover {
+  background-color: #58240f;
+}
+
+/* Ocre Button */
+.btn-ocre {
+  background-color: #c07d19;
+  color: #ffffff;
+  border: 1px solid #8c570a;
+}
+.btn-ocre:hover {
+  background-color: #9f640e;
+}
+
+/* Clean Centered Action Group */
+.btn-group-center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+@keyframes flowDash {
+  from {
+    stroke-dashoffset: 24;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+.animate-flow-dash {
+  animation: flowDash 1.2s linear infinite;
+}

@@ -1,0 +1,7 @@
+{
+  "name": "Protocolo GeoJornalismo - Fluxo e Auditoria Científica",
+  "description": "Sistematização do fluxo de trabalho metodológico e protocolo de validação por pontos de checagem para produção de mapas jornalísticos com dados espaciais, SIG e IA (Luna 2026c).",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
+

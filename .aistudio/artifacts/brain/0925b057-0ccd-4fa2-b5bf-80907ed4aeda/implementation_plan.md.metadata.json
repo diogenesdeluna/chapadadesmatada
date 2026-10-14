@@ -1,0 +1,6 @@
+{
+  "summary": "Plano de implementação para incorporação do modelo geojornalístico Chapada Desmatada (Luna, 2026) no visualizador interno e no publicador webmap do MapeIA, integrando dados reais da APA Chapada do Araripe, municípios, alertas MapBiomas, basemap Sentinel-2 EOX, navegação hierárquica em 3 níveis (Regional, Municipal e Alerta com fotos antes/depois) e integração com QGIS MCP.",
+  "updatedAt": "2026-10-14T17:39:38.344705190Z",
+  "requestFeedback": true,
+  "userFacing": true
+}
