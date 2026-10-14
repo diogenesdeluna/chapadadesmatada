@@ -661,6 +661,7 @@ export default function App() {
             onOpenAnalytics={() => setActiveTab('analytics')}
             onOpenAgents={() => setActiveTab('agents')}
             onOpenDesignEngine={() => setIsDesignEngineOpen(true)}
+            onOpenMap={() => setActiveTab('map')}
             onExportReport={() => setIsReportOpen(true)}
             onAbortFlow={handleAbortFlow}
             onOpenConfig={() => setIsConfigOpen(true)}

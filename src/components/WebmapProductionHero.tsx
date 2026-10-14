@@ -33,6 +33,7 @@ interface WebmapProductionHeroProps {
   onOpenAnalytics?: () => void;
   onOpenAgents?: () => void;
   onOpenDesignEngine?: () => void;
+  onOpenMap?: () => void;
   onExportReport?: () => void;
   onAbortFlow?: () => void;
   onOpenConfig?: () => void;
@@ -51,6 +52,7 @@ export const WebmapProductionHero: React.FC<WebmapProductionHeroProps> = ({
   onOpenAnalytics,
   onOpenAgents,
   onOpenDesignEngine,
+  onOpenMap,
   onExportReport,
   onAbortFlow
 }) => {
@@ -160,6 +162,19 @@ export const WebmapProductionHero: React.FC<WebmapProductionHeroProps> = ({
                 >
                   <Sparkles className="w-4 h-4 text-[#c07d19]" />
                   <span>Estúdio de Design</span>
+                </button>
+              )}
+
+              {/* Webmap Narrativo Chapada Desmatada (Luna, 2026) */}
+              {onOpenMap && (
+                <button
+                  type="button"
+                  onClick={onOpenMap}
+                  className="btn-base btn-lg bg-emerald-800 text-white hover:bg-emerald-900 border border-emerald-950 cursor-pointer text-sm font-semibold px-5 py-4 shadow-2xs"
+                  title="Acessar o Webmap Narrativo Interativo com Sentinel-2 Cloudless (Modelo Chapada Desmatada)"
+                >
+                  <Globe className="w-4 h-4 text-emerald-300" />
+                  <span>Webmap Chapada</span>
                 </button>
               )}
 
@@ -283,6 +298,19 @@ export const WebmapProductionHero: React.FC<WebmapProductionHeroProps> = ({
                   >
                     <Sparkles className="w-3.5 h-3.5 text-[#c07d19]" />
                     <span>Design</span>
+                  </button>
+                )}
+
+                {/* Webmap Narrativo Chapada Desmatada (Luna, 2026) */}
+                {onOpenMap && (
+                  <button
+                    type="button"
+                    onClick={onOpenMap}
+                    className="btn-base btn-sm text-emerald-950 bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 shadow-2xs cursor-pointer font-semibold"
+                    title="Visualizar o Webmap Narrativo Interativo com base Sentinel-2 Cloudless (Luna, 2026)"
+                  >
+                    <Globe className="w-3.5 h-3.5 text-emerald-700" />
+                    <span>Webmap Chapada</span>
                   </button>
                 )}
 

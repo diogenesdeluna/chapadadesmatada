@@ -74,6 +74,22 @@ export const ProjectConfigModal: React.FC<ProjectConfigModalProps> = ({
     });
   };
 
+  const handleLoadChapadaPreset = () => {
+    setFormData({
+      ...project,
+      title: 'Web Story Chapada do Araripe — Supressão Vegetal na APA',
+      territoryDescription: 'Área de Proteção Ambiental Chapada do Araripe (CE, PE, PI) e 18 municípios do território',
+      targetObject: 'Alertas de supressão vegetal MapBiomas Alerta (2019-2025)',
+      regionalLayerName: 'APA Chapada do Araripe (ICMBio/MMA)',
+      localLayerName: 'Malha dos 18 Municípios da APA (IBGE)',
+      detailLayerName: 'Alertas MapBiomas Alerta intra e extra-APA',
+      rawDownloadFormat: 'Shapefile (.shp, .shx, .dbf, .prj)',
+      rawDownloadCrs: 'SIRGAS 2000 Brasil (EPSG:4674)',
+      calculationCrs: 'EPSG:10857 (SIRGAS 2000 / Brasil Albers)',
+      outputCrs: 'EPSG:3857 (Web Mercator para Mapa Interativo)'
+    });
+  };
+
   const handleConsultGoogleMapsGrounding = async () => {
     try {
       setIsQueryingMaps(true);
@@ -152,11 +168,19 @@ export const ProjectConfigModal: React.FC<ProjectConfigModalProps> = ({
           <div className="flex items-center gap-2 shrink-0">
             <button
               type="button"
+              onClick={handleLoadChapadaPreset}
+              className="px-2.5 py-1 bg-emerald-700 hover:bg-emerald-800 text-white rounded font-mono text-[11px] font-semibold transition-colors cursor-pointer shadow-xs flex items-center gap-1"
+              title="Preenche automaticamente com os dados da Chapada do Araripe (Luna, 2026)"
+            >
+              <span>🛰️ Carregar Chapada do Araripe (Luna, 2026)</span>
+            </button>
+            <button
+              type="button"
               onClick={handleClearToZero}
               className="px-2.5 py-1 bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 rounded font-mono text-[11px] font-semibold transition-colors cursor-pointer"
               title="Limpa todos os campos para digitar a pauta do zero"
             >
-              Limpar Todos os Campos (Início do Zero)
+              Limpar Campos
             </button>
           </div>
         </div>

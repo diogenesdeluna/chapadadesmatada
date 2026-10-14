@@ -1,844 +1,841 @@
 import { AuditRecord, ProjectMetadata } from '../types/workflow';
-import { buildConsolidatedGeoJson } from './spatialExportService';
+import {
+  CHAPADA_METADATA,
+  CHAPADA_RANKING,
+  CHAPADA_SERIES,
+  APA_POLYGON_GEOJSON,
+  MUNICIPIOS_GEOJSON,
+  CURATED_ALERTS_GEOJSON,
+  SENTINEL2_CLOUDLESS_XYZ,
+  SENTINEL2_ATTRIBUTION
+} from '../data/chapadaStoryData';
 
 /**
  * Service to generate, preview, and download the publication-ready standalone HTML webmap.
- * Conforms to the scientific methodology of Luna (2026c).
+ * Strictly adheres to the geojournalistic architecture of "Chapada Desmatada" (Luna, 2026),
+ * featuring Sentinel-2 Cloudless satellite imagery, floating glassmorphism panels,
+ * 3-level narrative zoom, MapBiomas before/after satellite imagery, and municipal ranking.
  */
 
 export function generatePublishedWebmapHtml(project: ProjectMetadata, records: AuditRecord[]): string {
-  const consolidatedGeoJson = buildConsolidatedGeoJson(records, project);
-  const geoJsonString = JSON.stringify(consolidatedGeoJson).replace(/</g, '\\u003c');
-
+  const validatedCount = records.filter((r) => r.evaluation === 'Sim').length;
+  const isCertified = validatedCount > 0;
   const publicationDate = new Date().toLocaleDateString('pt-BR', {
     day: '2-digit',
     month: 'long',
     year: 'numeric'
   });
 
-  const validatedCount = records.filter((r) => r.evaluation === 'Sim').length;
-  const isCertified = validatedCount > 0;
+  const payloadJson = JSON.stringify({
+    meta: {
+      ...CHAPADA_METADATA,
+      project_title: project.title || CHAPADA_METADATA.title,
+      researcher: project.researcher || 'Diógenes Luna',
+      institution: project.institution || 'UFCA / MapeIA',
+      publication_date: publicationDate,
+      validation_status: isCertified ? `${validatedCount}/64 atividades validadas` : 'Auditado'
+    },
+    ranking_municipios: CHAPADA_RANKING,
+    series_municipios: CHAPADA_SERIES,
+    geojson: {
+      chapada: APA_POLYGON_GEOJSON,
+      municipios: MUNICIPIOS_GEOJSON,
+      alertas: CURATED_ALERTS_GEOJSON
+    }
+  }).replace(/</g, '\\u003c');
 
-  return `<!DOCTYPE html>
+  return `<!doctype html>
 <html lang="pt-BR">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${project.title} · Webmap Jornalístico Publicado</title>
-  <meta name="description" content="Mapa Narrativo Interativo em Três Níveis: APA Chapada do Araripe, Cariri Cearense e Alertas de Supressão Vegetal. Auditado via Protocolo Luna (2026c).">
-  <meta name="author" content="${project.researcher} (${project.institution})">
-
-  <!-- Open Graph -->
-  <meta property="og:title" content="${project.title} · Webmap Interativo">
-  <meta property="og:description" content="Investigação espacial sobre alertas de desmatamento na APA Chapada do Araripe com dados geográficos auditados.">
-  <meta property="og:type" content="article">
-
-  <!-- Leaflet 1.9.4 CSS with Multiple CDNs for maximum compatibility -->
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
-
-  <!-- Google Fonts: Inter & JetBrains Mono -->
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
-
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#1f2618">
+  <title>${project.title || 'Web Story Chapada do Araripe'} · Webmap Geojornalístico</title>
+  <meta name="description" content="Webmap narrativo em três níveis sobre a supressão vegetal na APA Chapada do Araripe (2019-2025). Modelo geojornalístico Luna (2026).">
+  
+  <!-- Leaflet 1.9.4 CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+  
   <style>
     :root {
-      --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      --font-mono: 'JetBrains Mono', monospace;
-      --color-primary: #0f172a;
-      --color-accent: #059669;
-      --color-alert: #e11d48;
-      --color-warning: #d97706;
-      --color-border: #e2e8f0;
-      --color-bg-subtle: #f8fafc;
+      --apa: #ebb46b;
+      --inside: #e7352a;
+      --outside: #1976d2;
+      --panel-bg: rgba(31, 38, 24, 0.82);
+      --panel-border: rgba(255, 255, 255, 0.22);
+      --text: #ffffff;
+      --accent: #ebb46b;
     }
 
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
 
-    html, body {
+    html, body, #map {
+      width: 100%;
       height: 100%;
       margin: 0;
-      padding: 0;
-    }
-
-    body {
-      font-family: var(--font-sans);
-      color: #1e293b;
-      background-color: #f1f5f9;
-      line-height: 1.5;
-      display: flex;
-      flex-direction: column;
-      height: 100%;
-      min-height: 100vh;
-    }
-
-    /* Header Bar */
-    header.webmap-header {
-      background-color: #0f172a;
-      color: #ffffff;
-      padding: 1rem 1.5rem;
-      border-bottom: 2px solid #10b981;
-      display: flex;
-      flex-wrap: wrap;
-      align-items: center;
-      justify-content: space-between;
-      gap: 1rem;
-      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-    }
-
-    .brand-group {
-      display: flex;
-      flex-direction: column;
-      gap: 0.2rem;
-    }
-
-    .brand-tag {
-      font-family: var(--font-mono);
-      font-size: 0.68rem;
-      color: #34d399;
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-      font-weight: 700;
-    }
-
-    .brand-title {
-      font-size: 1.25rem;
-      font-weight: 800;
-      letter-spacing: -0.02em;
-      color: #ffffff;
-    }
-
-    .brand-meta {
-      font-size: 0.75rem;
-      color: #94a3b8;
-    }
-
-    .brand-meta strong {
-      color: #e2e8f0;
-    }
-
-    .badge-certified {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.4rem;
-      padding: 0.35rem 0.75rem;
-      background: rgba(16, 185, 129, 0.15);
-      border: 1px solid rgba(52, 211, 153, 0.4);
-      color: #34d399;
-      font-family: var(--font-mono);
-      font-size: 0.72rem;
-      border-radius: 6px;
-      font-weight: 600;
-    }
-
-    /* Sub-nav / Controls */
-    .controls-strip {
-      background: #ffffff;
-      border-bottom: 1px solid var(--color-border);
-      padding: 0.75rem 1.5rem;
-      display: flex;
-      flex-wrap: wrap;
-      align-items: center;
-      justify-content: space-between;
-      gap: 1rem;
-    }
-
-    .level-switcher {
-      display: flex;
-      background: #f1f5f9;
-      border-radius: 8px;
-      padding: 3px;
-      gap: 2px;
-    }
-
-    .level-btn {
-      border: none;
-      background: transparent;
-      padding: 0.4rem 0.8rem;
-      font-size: 0.75rem;
-      font-weight: 600;
-      color: #64748b;
-      cursor: pointer;
-      border-radius: 6px;
-      transition: all 0.15s ease;
-      font-family: var(--font-sans);
-    }
-
-    .level-btn:hover {
-      color: #0f172a;
-    }
-
-    .level-btn.active {
-      background: #ffffff;
-      color: #0f172a;
-      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-    }
-
-    .layer-toggles {
-      display: flex;
-      align-items: center;
-      flex-wrap: wrap;
-      gap: 0.9rem;
-      font-size: 0.75rem;
-      font-family: var(--font-mono);
-      color: #475569;
-    }
-
-    .layer-label {
-      display: flex;
-      align-items: center;
-      gap: 0.35rem;
-      cursor: pointer;
-    }
-
-    .layer-badge {
-      width: 10px;
-      height: 10px;
-      border-radius: 2px;
-      display: inline-block;
-    }
-
-    /* Main Container */
-    .app-main {
-      display: flex;
-      flex: 1;
-      position: relative;
       overflow: hidden;
-      min-height: 560px;
+      background: #192015;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      color: var(--text);
     }
 
-    #webmap-container {
-      flex: 1;
-      height: calc(100vh - 180px);
-      min-height: 540px;
-      background-color: #e2e8f0;
-      z-index: 1;
+    /* Top Certification Bar */
+    .top-meta-badge {
+      position: absolute;
+      top: 14px;
+      left: 14px;
+      z-index: 1000;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 12px;
+      background: rgba(20, 24, 17, 0.88);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 8px;
+      backdrop-filter: blur(10px);
+      box-shadow: 0 4px 14px rgba(0,0,0,0.4);
+      font-size: 11px;
+      font-family: monospace;
     }
 
-    /* Sidebar / Narrative Panel */
-    .narrative-sidebar {
-      width: 380px;
-      background: #ffffff;
-      border-left: 1px solid var(--color-border);
+    .top-meta-badge .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #34d399;
+      box-shadow: 0 0 8px #34d399;
+    }
+
+    /* Floating UI Stack (Glassmorphism over Sentinel-2) */
+    .ui-stack {
+      position: absolute;
+      z-index: 1000;
+      top: 14px;
+      right: 14px;
+      width: min(420px, calc(100vw - 28px));
+      max-height: calc(100vh - 40px);
       display: flex;
       flex-direction: column;
-      z-index: 2;
+      gap: 10px;
+      pointer-events: none;
       overflow-y: auto;
-      box-shadow: -4px 0 12px rgba(0,0,0,0.03);
+      padding-right: 2px;
     }
 
-    @media (max-width: 900px) {
-      .app-main {
-        flex-direction: column;
-      }
-      .narrative-sidebar {
-        width: 100%;
-        height: auto;
-        border-left: none;
-        border-top: 1px solid var(--color-border);
-      }
-      #webmap-container {
-        height: 55vh;
-      }
+    .ui-stack::-webkit-scrollbar {
+      width: 4px;
+    }
+    .ui-stack::-webkit-scrollbar-thumb {
+      background: rgba(255,255,255,0.25);
+      border-radius: 4px;
     }
 
-    .sidebar-section {
-      padding: 1.25rem;
-      border-bottom: 1px solid var(--color-border);
+    .panel {
+      overflow: hidden;
+      padding: 14px 16px;
+      color: #fff;
+      background: var(--panel-bg);
+      border: 1px solid var(--panel-border);
+      border-radius: 12px;
+      box-shadow: 0 18px 46px rgba(0,0,0,0.45);
+      backdrop-filter: blur(14px) saturate(130%);
+      -webkit-backdrop-filter: blur(14px) saturate(130%);
+      pointer-events: auto;
+      transition: all 0.2s ease;
     }
 
-    .sidebar-title {
-      font-size: 0.82rem;
-      font-family: var(--font-mono);
+    .hidden { display: none !important; }
+
+    .level-badge {
+      display: inline-block;
+      padding: 2px 8px;
+      background: rgba(235, 180, 107, 0.2);
+      border: 1px solid rgba(235, 180, 107, 0.4);
+      border-radius: 4px;
+      font-family: monospace;
+      font-size: 10px;
       font-weight: 700;
       text-transform: uppercase;
       letter-spacing: 0.05em;
-      color: #64748b;
-      margin-bottom: 0.5rem;
-      display: flex;
-      align-items: center;
-      gap: 0.4rem;
+      color: var(--accent);
+      margin-bottom: 8px;
     }
 
-    .narrative-lead {
-      font-size: 0.88rem;
-      color: #334155;
+    .level-badge.level-2 {
+      background: rgba(59, 130, 246, 0.2);
+      border-color: rgba(59, 130, 246, 0.4);
+      color: #93c5fd;
+    }
+
+    .level-badge.level-3 {
+      background: rgba(231, 53, 42, 0.25);
+      border-color: rgba(231, 53, 42, 0.4);
+      color: #fca5a5;
+    }
+
+    .panel-title {
+      margin: 0 0 6px;
+      font-size: 18px;
+      font-weight: 700;
+      line-height: 1.25;
+      letter-spacing: -0.01em;
+    }
+
+    .panel-subtitle {
+      margin: 0 0 12px;
+      font-size: 13px;
+      line-height: 1.45;
+      color: #fef08a;
+      font-style: italic;
+    }
+
+    .panel-body {
+      color: #f1f5f9;
+      font-size: 12.5px;
       line-height: 1.55;
-      margin-bottom: 0.75rem;
     }
 
-    .stat-card {
-      background: #f8fafc;
-      border: 1px solid #e2e8f0;
-      border-radius: 8px;
-      padding: 0.85rem;
-      margin-top: 0.75rem;
+    .panel-body p {
+      margin: 0 0 10px;
     }
 
-    .stat-row {
+    .text-highlight {
+      font-weight: 700;
+      color: #ffffff;
+      text-shadow: 0 0 6px rgba(255,255,255,0.25);
+    }
+
+    /* Ranking List */
+    .ranking-container {
+      max-height: 320px;
+      overflow-y: auto;
+      padding-right: 4px;
+      margin-top: 8px;
+    }
+
+    .ranking-row {
       display: flex;
-      justify-content: space-between;
       align-items: center;
-      font-size: 0.78rem;
-      margin-bottom: 0.35rem;
-      font-family: var(--font-mono);
+      gap: 8px;
+      padding: 6px 8px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 12px;
+      transition: background 0.15s ease;
     }
 
-    .stat-val {
+    .ranking-row:hover {
+      background: rgba(255, 255, 255, 0.12);
+    }
+
+    .rank-num {
+      width: 20px;
+      font-family: monospace;
       font-weight: 700;
-      color: #0f172a;
-    }
-
-    .stat-val.danger {
-      color: #e11d48;
-    }
-
-    .stat-val.success {
-      color: #059669;
-    }
-
-    /* Polygon details card */
-    .polygon-inspector {
-      background: #fff1f2;
-      border: 1px solid #fecdd3;
-      border-radius: 8px;
-      padding: 0.85rem;
-      margin-top: 0.75rem;
-    }
-
-    .polygon-inspector h4 {
-      font-size: 0.85rem;
-      font-weight: 700;
-      color: #9f1239;
-      margin-bottom: 0.35rem;
-    }
-
-    .polygon-inspector p {
-      font-size: 0.75rem;
-      color: #4c0519;
-      line-height: 1.4;
-    }
-
-    /* Footer */
-    footer.webmap-footer {
-      background: #ffffff;
-      border-top: 1px solid var(--color-border);
-      padding: 0.75rem 1.5rem;
-      font-size: 0.72rem;
-      color: #64748b;
-      display: flex;
-      flex-wrap: wrap;
-      justify-content: space-between;
-      align-items: center;
-      gap: 0.75rem;
-      font-family: var(--font-mono);
-    }
-
-    .footer-left strong {
-      color: #0f172a;
-    }
-
-    /* Leaflet popup customization */
-    .leaflet-popup-content-wrapper {
-      border-radius: 8px;
-      box-shadow: 0 10px 25px -5px rgba(0,0,0,0.15);
-      border: 1px solid #e2e8f0;
-    }
-
-    .popup-box {
-      font-family: var(--font-sans);
-      font-size: 0.78rem;
-      padding: 2px;
-    }
-
-    .popup-header {
-      font-weight: 700;
-      font-size: 0.88rem;
-      color: #0f172a;
-      border-bottom: 1px solid #f1f5f9;
-      padding-bottom: 0.35rem;
-      margin-bottom: 0.5rem;
-    }
-
-    .popup-table {
-      width: 100%;
-      border-collapse: collapse;
-      font-family: var(--font-mono);
-      font-size: 0.72rem;
-    }
-
-    .popup-table td {
-      padding: 2px 4px;
-    }
-
-    .popup-table td:first-child {
-      color: #64748b;
-    }
-
-    .popup-table td:last-child {
-      font-weight: 600;
+      color: var(--accent);
       text-align: right;
+      font-size: 11px;
+    }
+
+    .rank-name {
+      flex: 1;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      font-weight: 500;
+    }
+
+    .bar-track {
+      width: 80px;
+      height: 6px;
+      background: rgba(0,0,0,0.4);
+      border-radius: 999px;
+      overflow: hidden;
+    }
+
+    .bar {
+      height: 100%;
+      background: linear-gradient(90deg, #ebb46b, #e7352a);
+      border-radius: 999px;
+    }
+
+    .rank-val {
+      font-family: monospace;
+      font-weight: 700;
+      color: #fef08a;
+      font-size: 11px;
+      width: 70px;
+      text-align: right;
+    }
+
+    /* Mini Charts in Level 2 */
+    .chart-card {
+      margin: 10px 0;
+      padding: 10px;
+      background: rgba(0,0,0,0.25);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 8px;
+    }
+
+    .chart-title {
+      font-family: monospace;
+      font-size: 10.5px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: #cbd5e1;
+      margin-bottom: 6px;
+    }
+
+    .time-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 11px;
+      margin: 4px 0;
+    }
+
+    .time-row span {
+      width: 32px;
+      font-family: monospace;
+      color: #94a3b8;
+    }
+
+    .mini-track {
+      flex: 1;
+      height: 8px;
+      background: rgba(0,0,0,0.4);
+      border-radius: 4px;
+      overflow: hidden;
+    }
+
+    .mini-bar {
+      height: 100%;
+      background: #e7352a;
+      border-radius: 4px;
+    }
+
+    .mini-bar.current {
+      background: #ebb46b;
+    }
+
+    .time-row b {
+      font-family: monospace;
+      font-size: 11px;
+      width: 65px;
+      text-align: right;
+    }
+
+    /* Level 3 Alert Details & Photos */
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+      margin: 10px 0;
+    }
+
+    .kpi-box {
+      background: rgba(0,0,0,0.3);
+      padding: 8px;
+      border-radius: 6px;
+      border: 1px solid rgba(255,255,255,0.08);
+      font-size: 11px;
+    }
+
+    .kpi-box span {
+      display: block;
+      font-family: monospace;
+      color: #94a3b8;
+      text-transform: uppercase;
+      font-size: 9.5px;
+      margin-bottom: 2px;
+    }
+
+    .kpi-box b {
+      font-family: monospace;
+      color: #fef08a;
+      font-size: 13px;
+    }
+
+    .alert-images {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin: 10px 0;
+    }
+
+    .alert-figure {
+      background: rgba(0,0,0,0.4);
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid rgba(255,255,255,0.15);
+    }
+
+    .alert-figure figcaption {
+      padding: 4px 6px;
+      background: rgba(0,0,0,0.6);
+      font-family: monospace;
+      font-size: 9.5px;
+      border-bottom: 1px solid rgba(255,255,255,0.1);
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .alert-figure img {
+      width: 100%;
+      height: 100px;
+      object-fit: cover;
+      display: block;
+    }
+
+    .btn-row {
+      display: flex;
+      gap: 8px;
+      margin-top: 12px;
+    }
+
+    .btn {
+      flex: 1;
+      padding: 8px 12px;
+      border-radius: 6px;
+      font-size: 11.5px;
+      font-family: monospace;
+      font-weight: 700;
+      border: none;
+      cursor: pointer;
+      text-align: center;
+      transition: all 0.15s ease;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+    }
+
+    .btn.primary {
+      background: #e7352a;
+      color: #fff;
+    }
+    .btn.primary:hover { background: #cf271d; }
+
+    .btn.secondary {
+      background: rgba(255,255,255,0.15);
+      color: #fff;
+      border: 1px solid rgba(255,255,255,0.25);
+    }
+    .btn.secondary:hover { background: rgba(255,255,255,0.25); }
+
+    /* Source Footer */
+    .source-footer {
+      padding: 8px 12px;
+      border: 1px solid rgba(255,255,255,0.14);
+      border-radius: 8px;
+      background: rgba(20,24,17,0.85);
+      color: rgba(255,255,255,0.85);
+      font-size: 10.5px;
+      line-height: 1.4;
+      pointer-events: auto;
+    }
+
+    /* Legend (Bottom Left) */
+    .legend {
+      position: absolute;
+      left: 14px;
+      bottom: 14px;
+      z-index: 1000;
+      padding: 10px 14px;
+      border: 1px solid rgba(255,255,255,0.24);
+      border-radius: 8px;
+      background: rgba(20,24,17,0.88);
+      color: #fff;
+      font-size: 11.5px;
+      backdrop-filter: blur(10px);
+      box-shadow: 0 4px 14px rgba(0,0,0,0.4);
+    }
+
+    .legend-title {
+      font-family: monospace;
+      font-size: 10px;
+      text-transform: uppercase;
+      font-weight: 700;
+      color: var(--accent);
+      margin-bottom: 6px;
+    }
+
+    .legend-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin: 4px 0;
+    }
+
+    .sw { width: 24px; height: 10px; display: inline-block; }
+    .sw.apa { height: 0; border-top: 3px solid var(--apa); }
+    .sw.dash { height: 0; border-top: 2px dashed #fff; }
+    .sw.inside { background: rgba(231,53,42,0.65); border: 1.5px solid #e7352a; }
+    .sw.outside { background: rgba(25,118,210,0.6); border: 1.5px solid #1976d2; }
+
+    /* Mobile toggle */
+    .mobile-toggle {
+      position: absolute;
+      top: 14px;
+      right: 14px;
+      z-index: 1010;
+      display: none;
+      padding: 6px 12px;
+      background: rgba(20,24,17,0.9);
+      border: 1px solid rgba(255,255,255,0.3);
+      border-radius: 6px;
+      color: #fff;
+      font-size: 11px;
+      font-family: monospace;
+      cursor: pointer;
+    }
+
+    @media (max-width: 640px) {
+      .mobile-toggle { display: block; }
+      .ui-stack.collapsed { display: none; }
+      .ui-stack { top: 50px; }
+      .legend { display: none; }
     }
   </style>
 </head>
 <body>
+  <!-- Map Canvas -->
+  <div id="map"></div>
 
-  <!-- Top Header -->
-  <header class="webmap-header">
-    <div class="brand-group">
-      <div class="brand-tag">🗺️ Webmap Jornalístico · Protocolo de Geojornalismo Científico</div>
-      <h1 class="brand-title">${project.title}</h1>
-      <div class="brand-meta">
-        Autor & Auditor: <strong>${project.researcher}</strong> (${project.institution}) · Publicação: <strong>${publicationDate}</strong>
-      </div>
-    </div>
-
-    <div class="badge-certified">
-      <span>✓</span>
-      <span>${isCertified ? 'Rastro do Erro Auditado (100% Sim)' : 'Modo de Pré-visualização'}</span>
-    </div>
-  </header>
-
-  <!-- Controls Strip -->
-  <div class="controls-strip">
-    <!-- Level Switcher -->
-    <div class="level-switcher">
-      <button class="level-btn" id="btn-regional" onclick="setLevel('regional')">1. Regional (APA)</button>
-      <button class="level-btn" id="btn-local" onclick="setLevel('local')">2. Local (Municípios)</button>
-      <button class="level-btn active" id="btn-detalhe" onclick="setLevel('detalhe')">3. Detalhe (Alertas)</button>
-    </div>
-
-    <!-- Layer Toggles -->
-    <div class="layer-toggles">
-      <span style="font-weight: 700; color: #1e293b;">Camadas:</span>
-
-      <label class="layer-label">
-        <input type="checkbox" id="chk-apa" checked onchange="toggleLayer('apa')">
-        <span class="layer-badge" style="background: #10b981; border: 1px solid #059669;"></span>
-        <span>Poligonal APA (1.063.000 ha)</span>
-      </label>
-
-      <label class="layer-label">
-        <input type="checkbox" id="chk-municipios" checked onchange="toggleLayer('municipios')">
-        <span class="layer-badge" style="background: #3b82f6; border: 1px solid #2563eb;"></span>
-        <span>Municípios Cariri</span>
-      </label>
-
-      <label class="layer-label">
-        <input type="checkbox" id="chk-alertas" checked onchange="toggleLayer('alertas')">
-        <span class="layer-badge" style="background: #e11d48; border: 1px solid #be123c;"></span>
-        <span>Alertas de Supressão</span>
-      </label>
-
-      <label class="layer-label">
-        <input type="checkbox" id="chk-buffer" onchange="toggleLayer('buffer')">
-        <span class="layer-badge" style="background: rgba(147, 51, 234, 0.4); border: 1px dashed #7e22ce;"></span>
-        <span>Buffer 10km Amortecimento</span>
-      </label>
-    </div>
-
-    <!-- Basemap Selector -->
-    <div class="layer-toggles" style="border-left: 1px solid #cbd5e1; padding-left: 0.75rem;">
-      <span style="font-weight: 700; color: #1e293b;">Basemap:</span>
-      <select id="select-basemap" onchange="switchBasemap(this.value)" style="padding: 0.25rem 0.5rem; font-size: 0.75rem; border-radius: 4px; border: 1px solid #cbd5e1; background: #fff; font-family: var(--font-sans); font-weight: 600; color: #1e293b; cursor: pointer;">
-        <option value="google_hybrid" selected>🛰️ Google Satélite (Híbrido)</option>
-        <option value="google_satellite">🌍 Google Satélite (Puro)</option>
-        <option value="google_terrain">⛰️ Google Terreno</option>
-        <option value="google_streets">🗺️ Google Maps (Ruas)</option>
-        <option value="dark_mode">🌙 Modo Noturno (Dark)</option>
-        <option value="osm">🌐 OpenStreetMap</option>
-      </select>
-    </div>
+  <!-- Certification / Project Badge -->
+  <div class="top-meta-badge">
+    <div class="status-dot"></div>
+    <span><strong>${project.title || 'MapeIA · Chapada Desmatada'}</strong> · Modelo Luna (2026)</span>
   </div>
 
-  <!-- Main Map and Narrative Layout -->
-  <main class="app-main">
-    <!-- Leaflet Map Container -->
-    <div id="webmap-container"></div>
+  <button id="mobileToggle" class="mobile-toggle">Ocultar Painéis</button>
 
-    <!-- Editorial Narrative Sidebar -->
-    <aside class="narrative-sidebar">
-      <div class="sidebar-section">
-        <div class="sidebar-title">
-          <span>📖</span>
-          <span id="narrative-title">Nível 3: Detalhe / Ocorrência</span>
-        </div>
-        <p class="narrative-lead" id="narrative-body">
-          No nível de detalhe, os polígonos de alerta do MapBiomas e DETER revelam a supressão da cobertura vegetal sobre as encostas da Chapada do Araripe, nascentes do Rio Batateiras e recarga do Aquífero Missão Velha.
-        </p>
-
-        <!-- Area Breakdown Card -->
-        <div class="stat-card">
-          <div class="stat-row">
-            <span>Área Total de Alertas:</span>
-            <span class="stat-val" id="stat-total-ha">48,72 ha</span>
-          </div>
-          <div class="stat-row">
-            <span>Sobreposição na APA:</span>
-            <span class="stat-val danger" id="stat-apa-ha">48,72 ha (100%)</span>
-          </div>
-          <div class="stat-row">
-            <span>SRC de Cálculo Geodésico:</span>
-            <span class="stat-val">SIRGAS 2000 Brasil Albers</span>
-          </div>
-          <div class="stat-row">
-            <span>SRC de Publicação Web:</span>
-            <span class="stat-val">EPSG:3857 (Web Mercator)</span>
-          </div>
-        </div>
-
-        <!-- Selected Polygon Card -->
-        <div class="polygon-inspector" id="polygon-inspector">
-          <h4 id="insp-title">Clique em um polígono no mapa</h4>
-          <p id="insp-desc">Selecione qualquer área de alerta em vermelho ou contorno municipal para inspecionar os cálculos espaciais certificados.</p>
-        </div>
+  <!-- Floating UI Narrative Stack -->
+  <div class="ui-stack" id="uiStack">
+    <!-- Panel 1: Editorial Opening (Level 1) -->
+    <section id="editorialPanel" class="panel">
+      <div class="level-badge">Nível 1 · Abertura Regional</div>
+      <h1 class="panel-title">Web Story Chapada do Araripe: Pressão Antrópica na APA</h1>
+      <div class="panel-subtitle">Monitoramento de supressão vegetal na Unidade de Conservação Federal (2019–2025)</div>
+      <div class="panel-body">
+        <p>A <span class="text-highlight">Área de Preservação Ambiental Chapada do Araripe</span> abrange 18 municípios nos estados do Ceará, Pernambuco e Piauí.</p>
+        <p>Dados do <span class="text-highlight">MapBiomas Alerta</span> auditados no SIG apontam <span class="text-highlight">Araripe</span>, <span class="text-highlight">Santana do Cariri</span> e <span class="text-highlight">Salitre</span> na liderança das maiores extensões de supressão vegetal nativa na porção coincidente com a Unidade de Conservação.</p>
+        <p style="font-size: 11px; color: #cbd5e1;">💡 <em>Interatividade:</em> Clique em um município no mapa ou na lista para inspecionar a série histórica anual e os alertas individuais.</p>
       </div>
+    </section>
 
-      <div class="sidebar-section">
-        <div class="sidebar-title">
-          <span>🔬</span>
-          <span>Critério Científico & Rastro do Erro</span>
-        </div>
-        <p style="font-size: 0.75rem; color: #64748b; line-height: 1.5;">
-          Conforme o protocolo metodológico de Luna (2026c), <em>"um jornalismo baseado em método científico deixa um rastro por onde o erro pode ser detectado"</em>. Este mapa foi concebido através de 64 pontos de checagem binários nas 6 etapas do ciclo de dados de Luna (2026c).
-        </p>
+    <!-- Panel 2: Municipal Ranking (Level 1) -->
+    <section id="rankingPanel" class="panel">
+      <div style="display: flex; justify-content: space-between; align-items: center;">
+        <h2 class="panel-title" style="font-size: 14px;">Ranking do Desmatamento</h2>
+        <span style="font-family: monospace; font-size: 10px; color: #cbd5e1;">18 municípios</span>
       </div>
-    </aside>
-  </main>
+      <div class="panel-subtitle" style="font-size: 11px; margin-bottom: 6px;">Área acumulada na interseção com a APA, 2019–2025</div>
+      <div class="ranking-container" id="rankingList"></div>
+    </section>
 
-  <!-- Bottom Footer -->
-  <footer class="webmap-footer">
-    <div class="footer-left">
-      Metodologia: <strong>Luna (2026c)</strong> · Dados: <strong>ICMBio, IBGE (2024), MapBiomas Alerta, INPE DETER</strong>
-    </div>
-    <div class="footer-right">
-      <span>Sistema de Auditoria Imutável · Hash SHA-256 Verificado</span>
-    </div>
-  </footer>
+    <!-- Panel 3: Dynamic Detail Panel (Level 2 & Level 3) -->
+    <section id="detailPanel" class="panel hidden"></section>
 
-  <!-- Leaflet 1.9.4 JS with multi-CDN fallback for high reliability in exports and iframes -->
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <!-- Source Footer -->
+    <footer class="source-footer">
+      Fontes: <strong>MapBiomas Alerta</strong>, <strong>IBGE</strong> e <strong>ICMBio</strong>.<br>
+      Raster: <strong>Sentinel-2 cloudless (2025 by EOX)</strong>.<br>
+      Projeto QGIS: <code style="color: #fef08a;">projetoDesignChapadaAgosto.qgz</code>.
+    </footer>
+  </div>
+
+  <!-- Cartographic Legend -->
+  <div class="legend">
+    <div class="legend-title">Convenções Cartográficas</div>
+    <div class="legend-row"><span class="sw apa"></span><span>APA Chapada do Araripe</span></div>
+    <div class="legend-row"><span class="sw dash"></span><span>18 Municípios Selecionáveis</span></div>
+    <div class="legend-row"><span class="sw inside"></span><span>Alertas com Interseção na APA</span></div>
+    <div class="legend-row"><span class="sw outside"></span><span>Alertas fora da APA</span></div>
+  </div>
+
+  <!-- Leaflet 1.9.4 Script -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+
+  <!-- Embedded Authentic Data Payload -->
   <script>
-    if (typeof L === 'undefined') {
-      var fallbackScript = document.createElement('script');
-      fallbackScript.src = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js';
-      document.head.appendChild(fallbackScript);
-    }
+    window.CHAPADA_PAYLOAD = ${payloadJson};
   </script>
 
+  <!-- Application Logic -->
   <script>
     (function() {
-      // Safe Embedded GeoJSON dataset generated from the protocol
-      let DATASET = null;
-      try {
-        DATASET = JSON.parse(${JSON.stringify(geoJsonString)});
-      } catch (err) {
-        console.error('Erro ao ler DATASET GeoJSON:', err);
+      const P = window.CHAPADA_PAYLOAD;
+      let map;
+      let layers = {};
+      let state = {
+        level: 1,
+        municipio: null,
+        alert: null
+      };
+
+      const INITIAL_VIEW = {
+        center: [-7.35, -39.65],
+        zoom: 9
+      };
+
+      // Formatter
+      function fmt(val, dec = 1) {
+        return Number(val || 0).toLocaleString('pt-BR', { minimumFractionDigits: dec, maximumFractionDigits: dec });
       }
 
-      function initWebmap() {
-        if (typeof L === 'undefined') {
-          console.error('Leaflet não pôde ser carregado via CDN.');
-          return;
-        }
-
-        // Initialize Map
-        const map = L.map('webmap-container', {
-          center: [-7.23, -39.41],
-          zoom: 12,
-          zoomControl: true
+      function initMap() {
+        map = L.map('map', {
+          center: INITIAL_VIEW.center,
+          zoom: INITIAL_VIEW.zoom,
+          zoomControl: false
         });
 
-        // Basemaps Dictionary (Google Satellite, Google Maps, Terreno, Dark Mode, OpenStreetMap)
-        const baseLayers = {
-          google_hybrid: L.tileLayer('https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', {
-            attribution: '&copy; Google Maps / Google Earth',
-            maxZoom: 20
-          }),
-          google_satellite: L.tileLayer('https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', {
-            attribution: '&copy; Google Maps / Google Earth',
-            maxZoom: 20
-          }),
-          google_terrain: L.tileLayer('https://mt1.google.com/vt/lyrs=p&x={x}&y={y}&z={z}', {
-            attribution: '&copy; Google Maps',
-            maxZoom: 20
-          }),
-          google_streets: L.tileLayer('https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
-            attribution: '&copy; Google Maps',
-            maxZoom: 20
-          }),
-          dark_mode: L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}', {
-            attribution: '&copy; Esri, OpenStreetMap',
-            maxZoom: 16
-          }),
-          osm: L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-            maxZoom: 19
-          })
-        };
+        L.control.zoom({ position: 'bottomright' }).addTo(map);
 
-        let currentBasemapLayer = baseLayers.google_hybrid;
-        currentBasemapLayer.addTo(map);
+        // 1. Sentinel-2 Cloudless 2025 by EOX WMTS/XYZ Tile Layer
+        const sentinelLayer = L.tileLayer('${SENTINEL2_CLOUDLESS_XYZ}', {
+          attribution: '${SENTINEL2_ATTRIBUTION.replace(/"/g, '\\"')}',
+          maxZoom: 18
+        }).addTo(map);
 
-        window.switchBasemap = function(key) {
-          if (!baseLayers[key]) return;
-          if (currentBasemapLayer) {
-            map.removeLayer(currentBasemapLayer);
-          }
-          currentBasemapLayer = baseLayers[key];
-          map.addLayer(currentBasemapLayer);
-        };
-
-        // Layer Groups
-        const layerApa = L.layerGroup().addTo(map);
-        const layerMunicipios = L.layerGroup().addTo(map);
-        const layerAlertas = L.layerGroup().addTo(map);
-        const layerBuffer = L.layerGroup(); // Off by default
-
-        function getLayerCategory(feature) {
-          const p = (feature && feature.properties) || {};
-          const key = (p.layerKey || p.layer_key || p.nome_camada || p.tipo_camada || p.title || '').toLowerCase();
-          if (key.includes('apa') || key.includes('regional')) return 'apa';
-          if (key.includes('municip') || key.includes('local') || key.includes('crato') || key.includes('barbalha') || key.includes('santana')) return 'municipios';
-          if (key.includes('buffer') || key.includes('amortecimento')) return 'buffer';
-          return 'alertas';
-        }
-
-        // GeoJSON polygon styles
-        function getFeatureStyle(feature) {
-          const cat = getLayerCategory(feature);
-
-          if (cat === 'apa') {
-            return {
-              color: '#059669',
-              weight: 2.5,
-              opacity: 0.9,
-              fillColor: '#10b981',
-              fillOpacity: 0.12,
-              dashArray: '6, 4'
-            };
-          }
-
-          if (cat === 'municipios') {
-            return {
-              color: '#2563eb',
-              weight: 2,
-              opacity: 0.85,
-              fillColor: '#3b82f6',
-              fillOpacity: 0.15
-            };
-          }
-
-          if (cat === 'buffer') {
-            return {
-              color: '#7e22ce',
-              weight: 1.5,
-              opacity: 0.7,
-              fillColor: '#9333ea',
-              fillOpacity: 0.08,
-              dashArray: '4, 4'
-            };
-          }
-
-          // Default: Alertas de Supressão (Detalhe)
-          return {
-            color: '#be123c',
-            weight: 2,
+        // 2. APA Boundary Polygon
+        layers.chapada = L.geoJSON(P.geojson.chapada, {
+          style: {
+            color: '#ebb46b',
+            weight: 2.5,
             opacity: 0.95,
-            fillColor: '#e11d48',
-            fillOpacity: 0.55
-          };
-        }
+            fillColor: '#ebb46b',
+            fillOpacity: 0.08
+          },
+          interactive: false
+        }).addTo(map);
 
-        // Interaction handler
-        function onEachFeature(feature, layer) {
-          const p = feature.properties || {};
-
-          let popupContent = '<div class="popup-box">';
-          popupContent += '<div class="popup-header">' + (p.title || p.nome || p.nome_camada || p.layerTitle || 'Feição Territorial') + '</div>';
-          popupContent += '<table class="popup-table">';
-
-          if (p.areaHa || p.area_total_ha || p.area_municipal_ha || p.area_oficial_ha) {
-            const val = p.areaHa || p.area_total_ha || p.area_municipal_ha || p.area_oficial_ha;
-            popupContent += '<tr><td>Área Total:</td><td>' + Number(val).toFixed(2) + ' ha</td></tr>';
-          }
-          if (p.intersectionHa !== undefined || p.area_intersecao_apa_ha !== undefined) {
-            const interVal = p.intersectionHa !== undefined ? p.intersectionHa : p.area_intersecao_apa_ha;
-            popupContent += '<tr><td>Sobreposição APA:</td><td style="color:#e11d48;">' + Number(interVal).toFixed(2) + ' ha</td></tr>';
-          }
-          if (p.level || p.camada_nivel) {
-            popupContent += '<tr><td>Nível Territorial:</td><td>' + (p.level || p.camada_nivel) + '</td></tr>';
-          }
-          if (p.officialSource || p.orgao_fonte || p.fonte_primaria) {
-            popupContent += '<tr><td>Fonte Oficial:</td><td>' + (p.officialSource || p.orgao_fonte || p.fonte_primaria) + '</td></tr>';
-          }
-          if (p.detectionDate || p.data_deteccao) {
-            popupContent += '<tr><td>Detecção:</td><td>' + (p.detectionDate || p.data_deteccao) + '</td></tr>';
-          }
-          if (p.referencePoint || p.referencia_espacial) {
-            popupContent += '<tr><td>Referência:</td><td>' + (p.referencePoint || p.referencia_espacial) + '</td></tr>';
-          }
-          popupContent += '<tr><td>Auditoria SIG:</td><td style="color:#059669;">✓ Validado</td></tr>';
-          popupContent += '</table></div>';
-
-          layer.bindPopup(popupContent);
-
-          layer.on('click', function(e) {
-            updateInspectorCard(p);
-          });
-
-          layer.on('mouseover', function(e) {
-            if (layer.setStyle) {
-              layer.setStyle({ weight: 3.5, fillOpacity: 0.75 });
-            }
-          });
-
-          layer.on('mouseout', function(e) {
-            if (layer.setStyle) {
-              layer.setStyle(getFeatureStyle(feature));
-            }
-          });
-        }
-
-        function updateInspectorCard(p) {
-          const inspector = document.getElementById('polygon-inspector');
-          const title = document.getElementById('insp-title');
-          const desc = document.getElementById('insp-desc');
-
-          if (!title || !desc) return;
-
-          title.innerText = p.title || p.nome_camada || p.layerTitle || 'Feição Selecionada';
-          let html = '<div style="font-size:0.75rem; line-height: 1.45; margin-top: 0.35rem;">';
-          const area = p.areaHa || p.area_total_ha || p.area_municipal_ha;
-          if (area) html += '<strong>Área:</strong> ' + Number(area).toFixed(2) + ' ha (Albers)<br>';
-          const inter = p.intersectionHa !== undefined ? p.intersectionHa : p.area_intersecao_apa_ha;
-          if (inter !== undefined) html += '<strong>Interseção APA:</strong> <span style="color:#be123c; font-weight:700;">' + Number(inter).toFixed(2) + ' ha</span><br>';
-          const cond = p.condition || p.condicao_territorial;
-          if (cond) html += '<strong>Situação:</strong> ' + cond + '<br>';
-          const ref = p.referencePoint || p.referencia_espacial;
-          if (ref) html += '<strong>Local:</strong> ' + ref + '<br>';
-          if (p.description || p.descricao) html += '<p style="margin-top:0.25rem; color:#64748b;">' + (p.description || p.descricao) + '</p>';
-          html += '</div>';
-
-          desc.innerHTML = html;
-        }
-
-        // Populate Layers from GeoJSON
-        if (DATASET && DATASET.features && DATASET.features.length > 0) {
-          DATASET.features.forEach(function(feature) {
-            const geoLayer = L.geoJSON(feature, {
-              style: getFeatureStyle,
-              pointToLayer: function(f, latlng) {
-                const isSim = (f.properties && f.properties.avaliacao_binaria === 'Sim');
-                return L.circleMarker(latlng, {
-                  radius: 6,
-                  fillColor: isSim ? '#10b981' : '#f43f5e',
-                  color: '#ffffff',
-                  weight: 1.5,
-                  opacity: 1,
-                  fillOpacity: 0.9
-                });
+        // 3. 18 Municipalities Layer
+        layers.municipios = L.geoJSON(P.geojson.municipios, {
+          style: function(feat) {
+            return {
+              color: 'rgba(255,255,255,0.75)',
+              weight: 1.2,
+              dashArray: '5, 5',
+              fillColor: '#000',
+              fillOpacity: 0.03
+            };
+          },
+          onEachFeature: function(feat, layer) {
+            const munName = feat.properties.NM_MUN;
+            layer.bindTooltip('<b>' + munName + '</b><br><span style=\"color:#94a3b8\">Clique para inspecionar</span>', { sticky: true });
+            layer.on({
+              click: function() {
+                level2(munName);
               },
-              onEachFeature: onEachFeature
+              mouseover: function(e) {
+                if (state.level === 1) {
+                  layer.setStyle({ weight: 2.5, color: '#fef08a', fillOpacity: 0.15 });
+                }
+              },
+              mouseout: function(e) {
+                if (state.level === 1) {
+                  layers.municipios.resetStyle(layer);
+                }
+              }
             });
+          }
+        }).addTo(map);
 
-            const cat = getLayerCategory(feature);
-            if (cat === 'apa') {
-              layerApa.addLayer(geoLayer);
-            } else if (cat === 'municipios') {
-              layerMunicipios.addLayer(geoLayer);
-            } else if (cat === 'buffer') {
-              layerBuffer.addLayer(geoLayer);
-            } else {
-              layerAlertas.addLayer(geoLayer);
-            }
-          });
+        // 4. Alerts Layer
+        layers.alertas = L.geoJSON(P.geojson.alertas, {
+          style: function(feat) {
+            const isInside = Boolean(feat.properties.INSIDE_APA);
+            return {
+              color: isInside ? '#e7352a' : '#1976d2',
+              weight: 1.5,
+              fillColor: isInside ? '#e7352a' : '#1976d2',
+              fillOpacity: isInside ? 0.6 : 0.45
+            };
+          },
+          onEachFeature: function(feat, layer) {
+            const props = feat.properties;
+            const ha = props.AREA_NA_APA_HA || props.AREAHA;
+            layer.bindTooltip('<b>Alerta #' + props.CODEALERTA + '</b> (' + props.MUNICIPIO + ')<br><span style=\"color:#ef4444; font-weight:bold;\">' + fmt(ha) + ' ha na APA</span> · Ano ' + props.ANODETEC, { sticky: true });
+            layer.on('click', function() {
+              level3(feat);
+            });
+          }
+        }).addTo(map);
+
+        // Initially hide alerts until user zooms or enters level 2
+        map.removeLayer(layers.alertas);
+
+        renderRanking();
+      }
+
+      function renderRanking() {
+        const rows = P.ranking_municipios || [];
+        const max = Math.max(1, ...rows.map(r => Number(r.total_area_ha || 0)));
+        const container = document.getElementById('rankingList');
+        
+        container.innerHTML = rows.map((row, idx) => {
+          const pct = Math.max(2, (Number(row.total_area_ha || 0) / max) * 100);
+          return '<div class=\"ranking-row\" onclick=\"window.appLevel2(\\'' + row.municipio + '\\')\">' +
+            '<span class=\"rank-num\">' + (idx + 1) + '.</span>' +
+            '<span class=\"rank-name\">' + row.municipio + '</span>' +
+            '<div class=\"bar-track\"><div class=\"bar\" style=\"width:' + pct + '%\"></div></div>' +
+            '<span class=\"rank-val\">' + fmt(row.total_area_ha) + ' ha</span>' +
+            '</div>';
+        }).join('');
+      }
+
+      function level1() {
+        state.level = 1;
+        state.municipio = null;
+        state.alert = null;
+
+        document.getElementById('editorialPanel').classList.remove('hidden');
+        document.getElementById('rankingPanel').classList.remove('hidden');
+        document.getElementById('detailPanel').classList.add('hidden');
+
+        if (map.hasLayer(layers.alertas)) {
+          map.removeLayer(layers.alertas);
         }
 
-        // Layer Toggle Function
-        window.toggleLayer = function(layerName) {
-          if (layerName === 'apa') {
-            const chk = document.getElementById('chk-apa');
-            chk && chk.checked ? map.addLayer(layerApa) : map.removeLayer(layerApa);
-          } else if (layerName === 'municipios') {
-            const chk = document.getElementById('chk-municipios');
-            chk && chk.checked ? map.addLayer(layerMunicipios) : map.removeLayer(layerMunicipios);
-          } else if (layerName === 'alertas') {
-            const chk = document.getElementById('chk-alertas');
-            chk && chk.checked ? map.addLayer(layerAlertas) : map.removeLayer(layerAlertas);
-          } else if (layerName === 'buffer') {
-            const chk = document.getElementById('chk-buffer');
-            chk && chk.checked ? map.addLayer(layerBuffer) : map.removeLayer(layerBuffer);
-          }
-        };
-
-        // Territorial Level Switcher
-        window.setLevel = function(lvl) {
-          document.querySelectorAll('.level-btn').forEach(btn => btn.classList.remove('active'));
-          const activeBtn = document.getElementById('btn-' + lvl);
-          if (activeBtn) activeBtn.classList.add('active');
-
-          const narrativeTitle = document.getElementById('narrative-title');
-          const narrativeBody = document.getElementById('narrative-body');
-
-          if (lvl === 'regional') {
-            map.flyTo([-7.28, -39.42], 9, { duration: 1.2 });
-            if (narrativeTitle) narrativeTitle.innerText = 'Nível 1: Regional (APA Chapada do Araripe)';
-            if (narrativeBody) narrativeBody.innerText = 'A Área de Proteção Ambiental Chapada do Araripe abrange 1.063.000 hectares no semiárido nordestino (CE/PE/PI). O recorte regional contextualiza os corredores ecológicos e a transição entre Caatinga e Mata Úmida.';
-          } else if (lvl === 'local') {
-            map.flyTo([-7.23, -39.41], 11, { duration: 1.2 });
-            if (narrativeTitle) narrativeTitle.innerText = 'Nível 2: Local / Municípios do Cariri';
-            if (narrativeBody) narrativeBody.innerText = 'Ao aproximar para o território do Crato, Barbalha e Santana do Cariri, observa-se a relação entre a cuesta tabular da Chapada, os perímetros urbanos e as zonas de preservação permanente.';
-          } else if (lvl === 'detalhe') {
-            map.flyTo([-7.234, -39.412], 13.5, { duration: 1.2 });
-            if (narrativeTitle) narrativeTitle.innerText = 'Nível 3: Detalhe / Ocorrência dos Alertas';
-            if (narrativeBody) narrativeBody.innerText = 'No nível de detalhe, os polígonos de alerta revelam os focos específicos de supressão vegetal, com cálculo de área geodésica em Albers e verificação de nós topológicos sem sobreposição.';
-          }
-        };
-
-        // Ensure Leaflet map sizes correctly on load and on resize
-        setTimeout(function() {
-          map.invalidateSize();
-        }, 150);
-        setTimeout(function() {
-          map.invalidateSize();
-        }, 600);
-        window.addEventListener('resize', function() {
-          map.invalidateSize();
+        layers.municipios.eachLayer(function(l) {
+          layers.municipios.resetStyle(l);
         });
 
-        // Set initial view
-        window.setLevel('detalhe');
+        map.flyTo(INITIAL_VIEW.center, INITIAL_VIEW.zoom, { duration: 0.8 });
       }
 
-      function startWhenLeafletReady() {
-        var attempts = 0;
-        function check() {
-          if (typeof L !== 'undefined') {
-            initWebmap();
-          } else if (attempts < 60) {
-            attempts++;
-            setTimeout(check, 100);
-          } else {
-            console.error('Leaflet não pôde ser carregado via CDN.');
-            var container = document.getElementById('webmap-container');
-            if (container) {
-              container.innerHTML = '<div style="padding: 2.5rem; color: #fff; background: #0f172a; text-align: center; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center;"><h3 style="color: #f43f5e; margin-bottom: 0.5rem; font-family: sans-serif;">Falha de Conexão com CDN do Mapa</h3><p style="color: #94a3b8; font-size: 0.85rem; max-width: 500px; line-height: 1.5; font-family: sans-serif;">A biblioteca cartográfica Leaflet não respondeu. Conecte-se à internet ou recarregue a página.</p></div>';
-            }
-          }
+      function level2(munName) {
+        state.level = 2;
+        state.municipio = munName;
+        state.alert = null;
+
+        document.getElementById('editorialPanel').classList.add('hidden');
+        document.getElementById('rankingPanel').classList.add('hidden');
+        const detail = document.getElementById('detailPanel');
+        detail.classList.remove('hidden');
+
+        if (!map.hasLayer(layers.alertas)) {
+          map.addLayer(layers.alertas);
         }
-        check();
+
+        // Highlight selected municipality and zoom to it
+        let targetLayer;
+        layers.municipios.eachLayer(function(l) {
+          if (l.feature.properties.NM_MUN === munName) {
+            targetLayer = l;
+            l.setStyle({ color: '#fff', weight: 3, fillColor: '#ebb46b', fillOpacity: 0.25 });
+          } else {
+            layers.municipios.resetStyle(l);
+          }
+        });
+
+        if (targetLayer) {
+          map.flyToBounds(targetLayer.getBounds(), { padding: [40, 40], maxZoom: 13, duration: 0.8 });
+        }
+
+        // Render level 2 statistics
+        const rankItem = (P.ranking_municipios || []).find(r => r.municipio === munName) || {};
+        const seriesData = (P.series_municipios[munName] && P.series_municipios[munName].years) || [];
+        const maxSeries = Math.max(1, ...seriesData.map(y => y.area_ha || 0));
+
+        let html = '<div class=\"level-badge level-2\">Nível 2 · Município Selecionado</div>' +
+          '<div style=\"display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;\">' +
+          '<h2 class=\"panel-title\" style=\"margin:0;\">' + munName + '</h2>' +
+          '<button class=\"btn secondary\" onclick=\"window.appLevel1()\" style=\"padding:4px 10px; font-size:11px;\">← Voltar</button>' +
+          '</div>' +
+          '<div class=\"panel-subtitle\">' + munName + ' ocupa a ' + (rankItem.rank || '—') + 'ª posição no ranking regional.</div>' +
+          '<div class=\"panel-body\">' +
+          '<p>Desmatamento acumulado (2019–2025): <strong style=\"color:#fef08a\">' + fmt(rankItem.total_area_ha) + ' hectares</strong> em <strong>' + (rankItem.total_alertas || '—') + ' alertas</strong>.</p>' +
+          '</div>';
+
+        // Time series chart
+        if (seriesData.length > 0) {
+          html += '<div class=\"chart-card\">' +
+            '<div class=\"chart-title\">Série Temporal Anual (Área na APA)</div>' +
+            seriesData.map(y => {
+              const pct = Math.max(2, (y.area_ha / maxSeries) * 100);
+              return '<div class=\"time-row\">' +
+                '<span>' + y.ano + '</span>' +
+                '<div class=\"mini-track\"><div class=\"mini-bar ' + (y.ano === 2025 ? 'current' : '') + '\" style=\"width:' + pct + '%\"></div></div>' +
+                '<b>' + fmt(y.area_ha) + ' ha</b>' +
+                '</div>';
+            }).join('') +
+            '</div>';
+        }
+
+        html += '<p style=\"font-size:11px; color:#cbd5e1; margin-top:8px;\">💡 Clique em qualquer polígono de alerta rubro para abrir o laudo com fotos de satélite antes/depois.</p>';
+
+        detail.innerHTML = html;
       }
 
+      function level3(feat) {
+        state.level = 3;
+        const props = feat.properties;
+        const code = props.CODEALERTA;
+        state.alert = code;
+
+        const detail = document.getElementById('detailPanel');
+        detail.classList.remove('hidden');
+
+        const insideHa = props.AREA_NA_APA_HA || props.AREAHA;
+        const beforeImg = 'https://image.alerta.mapbiomas.org/image/alert/' + code + '/before_deforestation.png';
+        const afterImg = 'https://image.alerta.mapbiomas.org/image/alert/' + code + '/after_deforestation.png';
+        const mapbiomasUrl = 'https://plataforma.alerta.mapbiomas.org/alerta/' + code;
+
+        let html = '<div class=\"level-badge level-3\">Nível 3 · Alerta MapBiomas</div>' +
+          '<div style=\"display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;\">' +
+          '<h2 class=\"panel-title\" style=\"margin:0;\">Alerta #' + code + '</h2>' +
+          '<button class=\"btn secondary\" onclick=\"window.appLevel2(\\'' + props.MUNICIPIO + '\\')\" style=\"padding:4px 10px; font-size:11px;\">← ' + props.MUNICIPIO + '</button>' +
+          '</div>' +
+          '<div class=\"panel-subtitle\">' + props.MUNICIPIO + ' · ' + fmt(insideHa) + ' ha na APA</div>' +
+          '<div class=\"kpi-grid\">' +
+          '<div class=\"kpi-box\"><span>Área na APA</span><b>' + fmt(insideHa) + ' ha</b></div>' +
+          '<div class=\"kpi-box\"><span>Ano Detecção</span><b>' + props.ANODETEC + '</b></div>' +
+          '<div class=\"kpi-box\"><span>Data Detecção</span><b>' + (props.DATADETEC || '—') + '</b></div>' +
+          '<div class=\"kpi-box\"><span>Fonte</span><b>' + (props.FONTE ? props.FONTE.replace(/[{}]/g, '') : 'GLAD') + '</b></div>' +
+          '</div>' +
+          '<div class=\"alert-images\">' +
+          '<div class=\"alert-figure\">' +
+          '<figcaption><b>Antes</b><span>Satélite</span></figcaption>' +
+          '<img src=\"' + beforeImg + '\" alt=\"Antes ' + code + '\" onerror=\"this.style.display=\\'none\\'\"/>' +
+          '</div>' +
+          '<div class=\"alert-figure\">' +
+          '<figcaption><b>Depois</b><span>Satélite</span></figcaption>' +
+          '<img src=\"' + afterImg + '\" alt=\"Depois ' + code + '\" onerror=\"this.style.display=\\'none\\'\"/>' +
+          '</div>' +
+          '</div>' +
+          '<div class=\"btn-row\">' +
+          '<a href=\"' + mapbiomasUrl + '\" target=\"_blank\" class=\"btn primary\">Abrir Laudo MapBiomas ↗</a>' +
+          '<button class=\"btn secondary\" onclick=\"window.appLevel1()\">Visão Geral</button>' +
+          '</div>';
+
+        detail.innerHTML = html;
+
+        // Zoom to alert geometry
+        const tempLayer = L.geoJSON(feat);
+        map.flyToBounds(tempLayer.getBounds(), { padding: [50, 50], maxZoom: 15, duration: 0.8 });
+      }
+
+      // Expose navigation to global window for HTML inline clicks
+      window.appLevel1 = level1;
+      window.appLevel2 = level2;
+      window.appLevel3 = level3;
+
+      // Mobile toggle listener
+      document.getElementById('mobileToggle').addEventListener('click', function() {
+        const stack = document.getElementById('uiStack');
+        stack.classList.toggle('collapsed');
+        this.textContent = stack.classList.contains('collapsed') ? 'Exibir Painéis' : 'Ocultar Painéis';
+      });
+
+      // Start map when DOM ready
       if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', startWhenLeafletReady);
+        document.addEventListener('DOMContentLoaded', initMap);
       } else {
-        startWhenLeafletReady();
+        initMap();
       }
     })();
   </script>
@@ -857,7 +854,7 @@ export function downloadPublishedWebmapHtml(
   const htmlContent = generatePublishedWebmapHtml(project, records);
   const targetFilename =
     filename ||
-    `webmap_publicado_${project.id}_${Date.now()}.html`;
+    `webmap_chapada_desmatada_${project.id || 'export'}_${Date.now()}.html`;
 
   const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
@@ -879,11 +876,11 @@ export function getEmbedIframeSnippet(project: ProjectMetadata, publishedUrl?: s
   const src = publishedUrl || '/api/webmap/published';
   return `<iframe
   src="${src}"
-  title="${project.title} - Webmap Jornalístico"
+  title="${project.title || 'Chapada Desmatada'} - Webmap Narrativo"
   width="100%"
-  height="650"
+  height="700"
   frameborder="0"
-  style="border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden;"
+  style="border: 1px solid rgba(255,255,255,0.2); border-radius: 12px; overflow: hidden; background: #192015;"
   allowfullscreen
   loading="lazy"
 ></iframe>`;

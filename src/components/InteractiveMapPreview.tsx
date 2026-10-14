@@ -18,6 +18,7 @@ import { ProjectMetadata, AuditRecord } from '../types/workflow';
 import { MapContainer, TileLayer, Polygon, CircleMarker, Popup, Tooltip, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
+import { ChapadaWebmapViewer } from './ChapadaWebmapViewer';
 import {
   APA_ARARIPE_POLYGON_COORDS,
   MUNICIPIO_CRATO_COORDS,
@@ -244,14 +245,82 @@ export const InteractiveMapPreview: React.FC<InteractiveMapPreviewProps> = ({
   const barbalhaPositions = useMemo(() => geoJsonRingsToLeaflet(MUNICIPIO_BARBALHA_COORDS), []);
   const santanaPositions = useMemo(() => geoJsonRingsToLeaflet(MUNICIPIO_SANTANA_CARIRI_COORDS), []);
   const bufferPositions = useMemo(() => geoJsonRingsToLeaflet(BUFFER_10KM_COORDS), []);
+  const [activeMode, setActiveMode] = useState<'chapada' | 'audit'>('chapada');
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 space-y-5">
-      {/* Editorial Header */}
-      <div className="bg-white border border-slate-200 rounded-lg p-5 shadow-xs">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div>
-            <div className="flex items-center gap-2 text-xs font-mono text-slate-500 mb-1">
+      {/* Top Presentation Bar: Mode Selector */}
+      <div className="bg-white border border-slate-200 rounded-lg p-3 sm:p-4 shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+        <div>
+          <div className="flex items-center gap-2 text-[11px] font-mono text-slate-500 uppercase">
+            <span>Ambiente Cartográfico Interativo</span>
+            <span>·</span>
+            <span className="text-emerald-700 font-bold">Modelo Geojornalístico Luna (2026)</span>
+            <span>·</span>
+            <span className="text-slate-600">Base Sentinel-2 EOX Cloudless</span>
+          </div>
+          <h2 className="text-base sm:text-lg font-bold text-slate-900 mt-0.5">
+            {activeMode === 'chapada'
+              ? 'Webmap Narrativo Chapada Desmatada (Padrão de Publicação)'
+              : 'Inspetor Técnico de Camadas e Auditoria (SIG)'}
+          </h2>
+        </div>
+
+        <div className="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-end">
+          <div className="flex items-center gap-1 p-1 bg-slate-100 rounded-lg border border-slate-200 text-xs font-medium">
+            <button
+              type="button"
+              onClick={() => setActiveMode('chapada')}
+              className={`px-3 py-1.5 rounded transition-all cursor-pointer flex items-center gap-1.5 ${
+                activeMode === 'chapada'
+                  ? 'bg-emerald-700 text-white font-bold shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <span>🛰️ Chapada Desmatada</span>
+              <span className="text-[10px] bg-emerald-800 text-emerald-200 px-1.5 py-0.2 rounded font-mono">2026</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveMode('audit')}
+              className={`px-3 py-1.5 rounded transition-all cursor-pointer flex items-center gap-1.5 ${
+                activeMode === 'audit'
+                  ? 'bg-slate-900 text-white font-bold shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <Layers className="w-3.5 h-3.5" />
+              <span>Auditoria de Camadas</span>
+            </button>
+          </div>
+
+          {onPublishHtml && (
+            <button
+              type="button"
+              onClick={onPublishHtml}
+              className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-lg text-xs transition-colors flex items-center gap-1.5 shadow-xs cursor-pointer shrink-0"
+              title="Publicar e baixar o webmap autônomo completo em HTML5"
+            >
+              <Globe className="w-3.5 h-3.5 text-emerald-100" />
+              <span className="hidden md:inline">Publicar Webmap</span>
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* When in Chapada Desmatada Mode */}
+      {activeMode === 'chapada' && (
+        <ChapadaWebmapViewer onPublishHtml={onPublishHtml} />
+      )}
+
+      {/* When in Technical Audit Mode */}
+      {activeMode === 'audit' && (
+        <div className="space-y-5">
+          {/* Editorial Header */}
+          <div className="bg-white border border-slate-200 rounded-lg p-5 shadow-xs">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div>
+                <div className="flex items-center gap-2 text-xs font-mono text-slate-500 mb-1">
               <span>PRODUTO DO FLUXO JORNALÍSTICO (ETAPAS 4.1 A 4.6)</span>
               <span>·</span>
               <span className="text-emerald-700 font-bold">BASEMAP ATIVO: {activeBasemap.name}</span>
@@ -926,6 +995,8 @@ export const InteractiveMapPreview: React.FC<InteractiveMapPreviewProps> = ({
               </tbody>
             </table>
           </div>
+        </div>
+      )}
         </div>
       )}
     </div>

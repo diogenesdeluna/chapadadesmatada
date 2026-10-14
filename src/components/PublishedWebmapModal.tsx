@@ -91,14 +91,14 @@ export const PublishedWebmapModal: React.FC<PublishedWebmapModalProps> = ({
             <div>
               <div className="flex items-center gap-2">
                 <span className="text-[11px] font-mono text-emerald-400 font-semibold uppercase tracking-wider">
-                  Artefato Final da Fase 6 (Comunicar) · Pronto para Publicação
+                  Artefato Final · Modelo Geojornalístico Chapada Desmatada (Luna, 2026)
                 </span>
                 <span className="text-[10px] bg-slate-800 text-emerald-300 border border-emerald-500/30 px-2 py-0.5 rounded font-mono">
-                  HTML5 + Leaflet 1.9.4
+                  Sentinel-2 Cloudless · HTML5 Standalone
                 </span>
               </div>
               <h2 className="text-base sm:text-lg font-bold text-white tracking-tight">
-                Mapa Narrativo Interativo Publicado em HTML
+                Webmap Narrativo Publicado: Chapada do Araripe
               </h2>
             </div>
           </div>
